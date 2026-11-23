@@ -1,6 +1,6 @@
 pkgs:
 let sdk = pkgs.dotnetCorePackages.sdk_10_0;
-in pkgs.runCommand "drvnet-normalize" {} ''
+in pkgs.runCommand "drvnet-normalize" { __contentAddressed = true; } ''
   export HOME="$TMPDIR/home" DOTNET_NOLOGO=1 DOTNET_CLI_TELEMETRY_OPTOUT=1
   mkdir -p "$HOME" project
   cp ${./normalize/Normalize.csproj} project/Normalize.csproj

@@ -10,7 +10,10 @@ let
     };
     project = "DevProxy.Abstractions/DevProxy.Abstractions.csproj";
   };
-in pkgs.runCommand "drvnet-dev-proxy-test" { nativeBuildInputs = [ sdk ]; } ''
+in pkgs.runCommand "drvnet-dev-proxy-test" {
+  __contentAddressed = true;
+  nativeBuildInputs = [ sdk ];
+} ''
   export HOME="$TMPDIR" DOTNET_NOLOGO=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE=true
   export BENCH_ASSEMBLIES="${assembly}/lib/dotnet"
   mkdir check

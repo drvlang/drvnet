@@ -1,6 +1,6 @@
 # drvnet
 
-Build, test, and run SDK-style .NET projects from their native NuGet locks. Nix plans individual package downloads from the MSBuild project graph, and the .NET SDK restores in locked mode from a local feed. Commit the SDK's `packages.lock.json` for each referenced project. A normal native lockfile update is enough to change dependencies.
+Build, test, and run SDK-style .NET projects from their native NuGet locks. Nix plans individual package downloads from the MSBuild project graph, and the .NET SDK restores in locked mode from a local feed. Commit the SDK's `packages.lock.json` for each referenced project. A normal native lockfile update is enough to change dependencies. The feed and published assemblies are content-addressed, so builds of a target that produce identical files and store references reuse the same store path.
 
 From a repository with an executable project and its tests, run
 

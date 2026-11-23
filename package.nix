@@ -48,7 +48,7 @@ let
     export DOTNET_NOLOGO=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE=true
     mkdir -p "$HOME"
   '';
-  plan = pkgs.runCommand "drvnet-plan.json" {} ''
+  plan = pkgs.runCommand "drvnet-plan.json" { __contentAddressed = true; } ''
     ${environment}
     cp -r ${source} workspace
     chmod -R u+w workspace
@@ -70,11 +70,16 @@ let
       }
     '';
   };
-  config = pkgs.writeText "NuGet.Config" ''
-    <configuration><packageSources><clear/><add key="locked" value="${feed}"/></packageSources>
-    <fallbackPackageFolders><clear/></fallbackPackageFolders></configuration>
-  '';
+  config = pkgs.writeTextFile {
+    name = "NuGet.Config";
+    derivationArgs.__contentAddressed = true;
+    text = ''
+      <configuration><packageSources><clear/><add key="locked" value="${feed}"/></packageSources>
+      <fallbackPackageFolders><clear/></fallbackPackageFolders></configuration>
+    '';
+  };
 in pkgs.stdenvNoCC.mkDerivation {
+  __contentAddressed = true;
   name = if test then "drvnet-test" else "drvnet-publish";
   src = source;
   nativeBuildInputs = [ sdk pkgs.makeWrapper ];

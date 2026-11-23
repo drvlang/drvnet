@@ -19,4 +19,4 @@ let
         '';
       };
     };
-in pkgs.linkFarm "drvnet-feed" (map archive plan)
+in (pkgs.linkFarm "drvnet-feed" (map archive plan)).overrideAttrs { __contentAddressed = true; }

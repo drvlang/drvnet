@@ -9,15 +9,24 @@
     mkPackage = import ./package.nix { inherit drvkit; };
     mkTest = import ./package.nix { inherit drvkit; test = true; };
     selectTarget = { src, name, target }: { inherit src; projectDir = target; };
-    extraChecks = system: {
-      benchmark = import ./benchmarks { pkgs = nixpkgs.legacyPackages.${system}; inherit self system; };
-      xunit = (self.lib.mkMonorepoFlake {
+    extraChecks = system: let
+      pkgs = nixpkgs.legacyPackages.${system};
+      workspace = self.lib.mkMonorepoFlake {
         inherit (builtins.fromJSON (builtins.readFile ./tests/drvlang.json)) commands;
         srcForTarget = { target, ... }: self.lib.projectSource {
           root = ./tests;
           files = [ (./tests + "/${target}") (./tests + "/${target}.Tests") ./tests/pkg/Shared ];
         };
-      }).checks.${system}.app;
+      };
+      package = workspace.packages.${system}.app;
+      rebuilt = package.overrideAttrs { DRVLANG_REBUILD_CHECK = "1"; };
+    in {
+      benchmark = import ./benchmarks { inherit pkgs self system; };
+      xunit = workspace.checks.${system}.app;
+      content-addressing = pkgs.runCommand "drvnet-check-content-addressing" { __contentAddressed = true; } ''
+        test ${package} = ${rebuilt}
+        touch "$out"
+      '';
     };
   };
 }
