@@ -38,6 +38,8 @@ For one program, pass `src = drvnet.lib.projectSource { root = ./.; files = [ ./
 
 Use `nix build .#api`, `nix flake check`, and `nix run .#api -- hello`. The CLI accepts the same names with `build api` and `run api -- hello`.
 
+For faster source-only edits, set `restoreFiles` to the repository-relative paths MSBuild reads to discover projects and dependencies. Include the build and test project files and locks, referenced projects' manifests and locks, shared imports such as `Directory.Build.props`, and any files read by custom restore targets. The CLI accepts the same list under `--options`. By default the planner sees the full selected source.
+
 The default SDK is .NET 10 on x86-64 and AArch64 Linux. Public NuGet.org lockfile versions 1 and 2 are supported. For signed packages, the SDK verifies the original signature and timestamp with offline revocation checks. Nix checks SHA-512 against the native lock. When the lock identifies pre-signing bytes, the local feed contains the exact original ZIP with the signature envelope removed. [NuGet package signatures](https://learn.microsoft.com/en-us/nuget/reference/signed-packages-reference)
 
 Enable these Nix settings on the client and build daemon, then restart the daemon after changing its configuration.

@@ -17,6 +17,11 @@
           root = ./tests;
           files = [ (./tests + "/${target}") (./tests + "/${target}.Tests") ./tests/pkg/Shared ];
         };
+        restoreFiles = [
+          "apps/App/App.csproj" "apps/App/packages.lock.json"
+          "apps/App.Tests/App.Tests.csproj" "apps/App.Tests/packages.lock.json"
+          "pkg/Shared/Shared.csproj" "pkg/Shared/packages.lock.json"
+        ];
       };
       package = workspace.packages.${system}.app;
       rebuilt = package.overrideAttrs { DRVLANG_REBUILD_CHECK = "1"; };

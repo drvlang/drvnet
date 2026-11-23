@@ -2,13 +2,14 @@
 let
   sdk = pkgs.dotnetCorePackages.sdk_10_0;
   root = /. + builtins.unsafeDiscardStringContext (import ./source.nix).outPath;
+  project = "DevProxy.Abstractions/DevProxy.Abstractions.csproj";
   assembly = self.lib.mkPackage {
-    inherit system sdk;
+    inherit system sdk project;
     src = self.lib.projectSource {
       inherit root;
       files = map (p: root + ("/" + p)) [ "DevProxy.Abstractions" "Directory.Build.props" ".editorconfig" "media/icon.png" ];
     };
-    project = "DevProxy.Abstractions/DevProxy.Abstractions.csproj";
+    restoreFiles = [ project "DevProxy.Abstractions/packages.lock.json" "Directory.Build.props" ];
   };
 in pkgs.runCommand "drvnet-dev-proxy-test" {
   __contentAddressed = true;
