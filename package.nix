@@ -17,9 +17,10 @@ let
   planSource = if restoreFiles == null then source
     else if restoreFiles == [] then throw "restoreFiles must include the project manifests and locks"
     else if lib.isDerivation source then pkgs.runCommand "drvnet-restore-inputs" { __contentAddressed = true; } ''
+      set -o pipefail
       mkdir -p "$out"
       cd ${source}
-      cp --parents -r -- ${lib.escapeShellArgs restorePaths} "$out"
+      tar -cf - -- ${lib.escapeShellArgs restorePaths} | tar --delay-directory-restore -xf - -C "$out"
     '' else let
       root = toString source.origSrc;
       paths = map (p: if p == "." then root else root + "/" + lib.removePrefix "./" p) restorePaths;
