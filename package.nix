@@ -93,6 +93,7 @@ let
   };
   config = pkgs.writeTextFile {
     name = "NuGet.Config";
+    allowSubstitutes = true;
     derivationArgs.__contentAddressed = true;
     text = ''
       <configuration><packageSources><clear/><add key="locked" value="${feed}"/></packageSources>

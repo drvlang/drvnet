@@ -19,4 +19,7 @@ let
         '';
       };
     };
-in (pkgs.linkFarm "drvnet-feed" (map archive plan)).overrideAttrs { __contentAddressed = true; }
+in (pkgs.linkFarm "drvnet-feed" (map archive plan)).overrideAttrs {
+  __contentAddressed = true;
+  allowSubstitutes = true;
+}
