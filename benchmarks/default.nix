@@ -1,9 +1,13 @@
 { self, pkgs, system }:
 let
   sdk = pkgs.dotnetCorePackages.sdk_10_0;
-  src = (import ./source.nix).outPath;
+  root = /. + builtins.unsafeDiscardStringContext (import ./source.nix).outPath;
   assembly = self.lib.mkPackage {
-    inherit system src sdk;
+    inherit system sdk;
+    src = self.lib.projectSource {
+      inherit root;
+      files = map (p: root + ("/" + p)) [ "DevProxy.Abstractions" "Directory.Build.props" ".editorconfig" "media/icon.png" ];
+    };
     project = "DevProxy.Abstractions/DevProxy.Abstractions.csproj";
   };
 in pkgs.runCommand "drvnet-dev-proxy-test" { nativeBuildInputs = [ sdk ]; } ''

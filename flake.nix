@@ -11,7 +11,13 @@
     selectTarget = { src, name, target }: { inherit src; projectDir = target; };
     extraChecks = system: {
       benchmark = import ./benchmarks { pkgs = nixpkgs.legacyPackages.${system}; inherit self system; };
-      xunit = (self.lib.mkMonorepoFlake { src = ./tests; }).checks.${system}.suite;
+      xunit = (self.lib.mkMonorepoFlake {
+        inherit (builtins.fromJSON (builtins.readFile ./tests/drvlang.json)) commands;
+        srcForTarget = { target, ... }: self.lib.projectSource {
+          root = ./tests;
+          files = [ (./tests + "/${target}") (./tests + "/${target}.Tests") ./tests/pkg/Shared ];
+        };
+      }).checks.${system}.app;
     };
   };
 }

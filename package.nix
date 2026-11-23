@@ -13,14 +13,32 @@ let
   file = if test && testProject != null then testProject else if project != null then project else projectDir;
   selectProject = ''
     project=${lib.escapeShellArg file}
+    shopt -s nullglob
     if [[ -d "$project" ]]; then
-      shopt -s nullglob
       candidates=("$project"/*.{cs,fs,vb}proj)
       if (( ''${#candidates[@]} != 1 )); then
         echo "drvnet needs one SDK project in $project, or an explicit project path" >&2
         exit 1
       fi
       project="''${candidates[0]}"
+    fi
+  '' + lib.optionalString (test && testProject == null) ''
+    isTest=$(${sdk}/bin/dotnet msbuild "$project" -nologo -getProperty:IsTestProject -p:Configuration=Release)
+    if [[ "''${isTest,,}" != true ]]; then
+      name=$(basename "$project")
+      suite="''${name%.*}.Tests"
+      declare -A matches=()
+      for testFile in "$(dirname "$project")/../$suite"/"$suite".{cs,fs,vb}proj \
+                      "tests/$suite"/"$suite".{cs,fs,vb}proj; do
+        if [[ -f "$testFile" ]]; then matches["$(realpath "$testFile")"]=1; fi
+      done
+      candidates=("''${!matches[@]}")
+      if (( ''${#candidates[@]} > 1 )); then
+        echo "Several $suite projects match. Select one with testProject." >&2
+        exit 1
+      elif (( ''${#candidates[@]} == 1 )); then
+        project="''${candidates[0]}"
+      fi
     fi
   '';
   planner = import ./planner.nix pkgs;
@@ -68,7 +86,8 @@ in pkgs.stdenvNoCC.mkDerivation {
     dotnet restore "$project" --locked-mode --configfile ${config} --source ${feed} \
       -p:NuGetAudit=false -p:Configuration=Release
   '' + (if test then ''
-    if [[ "$(dotnet msbuild "$project" -nologo -getProperty:IsTestProject -p:Configuration=Release)" != "true" ]]; then
+    isTest=$(dotnet msbuild "$project" -nologo -getProperty:IsTestProject -p:Configuration=Release)
+    if [[ "''${isTest,,}" != true ]]; then
       echo "drvnet test needs a test project. Select it with testProject." >&2
       exit 1
     fi

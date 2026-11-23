@@ -93,6 +93,12 @@
           "xunit.extensibility.core": "[2.9.2]"
         }
       },
+      "app": {
+        "type": "Project",
+        "dependencies": {
+          "Shared": "[1.0.0, )"
+        }
+      },
       "shared": {
         "type": "Project"
       }

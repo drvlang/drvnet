@@ -6,15 +6,15 @@ From a repository with an executable project and its tests, run
 
 ```sh
 nix run github:drvlang/drvnet -- build ./src/App
-nix run github:drvlang/drvnet -- test ./tests/App.Tests
+nix run github:drvlang/drvnet -- test ./src/App
 nix run github:drvlang/drvnet -- run ./src/App -- hello
 ```
 
-The build publishes assemblies to `result/lib/dotnet`. An executable gets a launcher named after the assembly under `result/bin`. Pass test arguments after `--`, for example `test ./tests/App.Tests -- --filter Category=Fast`. Select a specific project with `--options '{"project":"src/App/App.csproj"}'` if a directory contains several.
+The build publishes assemblies to `result/lib/dotnet`. An executable gets a launcher named after the assembly under `result/bin`. For `App.csproj`, `test` finds `App.Tests/App.Tests.csproj` beside the member or under the repository's `tests/`. Pass `testProject` to select another suite. Test arguments follow `--`, for example `test ./src/App -- --filter Category=Fast`. Select a specific project with `--options '{"project":"src/App/App.csproj"}'` if a directory contains several.
 
 ## Flakes and monorepos
 
-Use `drvnet.lib.mkFlake { src = ./.; project = "src/App/App.csproj"; testProject = "tests/App.Tests/App.Tests.csproj"; }` for one program. Multiple programs can share solution-level MSBuild properties, project references, and a target map in the root `drvlang.json`.
+For one program, pass `src = drvnet.lib.projectSource { root = ./.; files = [ ./src/App ./tests/App.Tests ]; };` and `project = "src/App/App.csproj";` to `drvnet.lib.mkFlake`. Include the shared project directories and MSBuild files the project imports. Multiple programs can share a target map in the root `drvlang.json`.
 
 ```json
 {"commands":{"api":"apps/Api","worker":"apps/Worker"}}
@@ -24,8 +24,14 @@ Use `drvnet.lib.mkFlake { src = ./.; project = "src/App/App.csproj"; testProject
 {
   inputs.drvnet.url = "github:drvlang/drvnet";
   outputs = { self, drvnet }: drvnet.lib.mkMonorepoFlake {
-    src = ./.;
-    testProject = "tests/Integration.Tests/Integration.Tests.csproj";
+    inherit (builtins.fromJSON (builtins.readFile ./drvlang.json)) commands;
+    srcForTarget = { target, ... }: drvnet.lib.projectSource {
+      root = ./.;
+      files = [
+        (./. + "/${target}") (./tests + "/${baseNameOf target}.Tests")
+        ./pkg/Common ./Directory.Build.props
+      ];
+    };
   };
 }
 ```
