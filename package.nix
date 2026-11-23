@@ -1,50 +1,86 @@
-pkgs: { src, project ? null, sourcesFile ? null, sdk ? pkgs.dotnetCorePackages.sdk_10_0 }:
+{ drvkit, test ? false }:
+pkgs:
+{ src, project ? null, projectDir ? ".", testProject ? null, testArgs ? [], sdk ? pkgs.dotnetCorePackages.sdk_10_0 }:
 let
   inherit (pkgs) lib;
-  candidates = lib.filter (p: lib.hasSuffix ".csproj" p || lib.hasSuffix ".fsproj" p)
-    (builtins.attrNames (builtins.readDir src));
-  file = if project != null then project else if builtins.length candidates == 1 then builtins.head candidates
-    else throw "drvnet needs a single SDK project in the directory, or an explicit project path";
-  dir = src + ("/" + builtins.dirOf file);
-  lock = dir + "/packages.lock.json";
-  manifest = if sourcesFile == null then dir + "/drvnet-sources.json" else sourcesFile;
-  sources = if builtins.pathExists manifest then builtins.fromJSON (builtins.readFile manifest)
-    else throw "run drvnet-pin on packages.lock.json to create drvnet-sources.json beside the project";
-  archive = p:
-    assert lib.assertMsg (builtins.match "[a-zA-Z0-9][a-zA-Z0-9._+-]*" p.id != null &&
-      builtins.match "[a-zA-Z0-9][a-zA-Z0-9._+-]*" p.version != null) "invalid NuGet ID or version";
-    let name = "${p.id}.${p.version}.nupkg";
-    in { inherit name; path = pkgs.fetchurl { inherit name; inherit (p) hash;
-      url = "https://api.nuget.org/v3-flatcontainer/${p.id}/${p.version}/${name}"; }; };
-  feed = pkgs.linkFarm "drvnet-feed" (map archive sources.archives);
+  projectFile = p: lib.any (suffix: lib.hasSuffix suffix p) [ ".csproj" ".fsproj" ".vbproj" ];
+  source = if lib.isDerivation src then src else lib.cleanSourceWith {
+    inherit src;
+    name = "drvnet-source";
+    filter = path: type: !(type == "directory" && lib.elem (builtins.baseNameOf path) [ "bin" "obj" ] &&
+      lib.any projectFile (builtins.attrNames (builtins.readDir (builtins.dirOf path))));
+  };
+  file = if test && testProject != null then testProject else if project != null then project else projectDir;
+  selectProject = ''
+    project=${lib.escapeShellArg file}
+    if [[ -d "$project" ]]; then
+      shopt -s nullglob
+      candidates=("$project"/*.{cs,fs,vb}proj)
+      if (( ''${#candidates[@]} != 1 )); then
+        echo "drvnet needs one SDK project in $project, or an explicit project path" >&2
+        exit 1
+      fi
+      project="''${candidates[0]}"
+    fi
+  '';
+  planner = import ./planner.nix pkgs;
+  normalize = import ./normalize.nix pkgs;
+  environment = ''
+    export HOME="$TMPDIR/home" DOTNET_CLI_HOME="$TMPDIR/home" NUGET_PACKAGES="$TMPDIR/packages"
+    export DOTNET_NOLOGO=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE=true
+    mkdir -p "$HOME"
+  '';
+  plan = pkgs.runCommand "drvnet-plan.json" {} ''
+    ${environment}
+    cp -r ${source} workspace
+    chmod -R u+w workspace
+    cd workspace
+    ${selectProject}
+    ${sdk}/bin/dotnet msbuild "$project" -nologo -v:q -t:GenerateRestoreGraphFile \
+      -p:Configuration=Release -p:RestoreGraphOutputPath="$TMPDIR/restore.json"
+    ${planner}/bin/drvnet-plan "$PWD" "$TMPDIR/restore.json" > "$out"
+  '';
+  dynamic = import (drvkit + "/dynamic.nix") { inherit pkgs; };
+  feed = dynamic {
+    name = "drvnet-feed";
+    prepare = ''cp ${plan} plan.json'';
+    expression = ''
+      import ${./feed.nix} {
+        pkgs = import ${pkgs.path} { system = "${pkgs.stdenv.hostPlatform.system}"; };
+        plan = builtins.fromJSON (builtins.readFile ./plan.json);
+        normalize = builtins.storePath "${normalize}";
+      }
+    '';
+  };
   config = pkgs.writeText "NuGet.Config" ''
     <configuration><packageSources><clear/><add key="locked" value="${feed}"/></packageSources>
     <fallbackPackageFolders><clear/></fallbackPackageFolders></configuration>
   '';
-in
-assert lib.assertMsg (builtins.hashFile "sha256" lock == sources.lockSha256) "drvnet-sources.json is stale; rerun drvnet-pin";
-pkgs.stdenvNoCC.mkDerivation {
-  name = "drvnet-publish";
-  inherit src;
+in pkgs.stdenvNoCC.mkDerivation {
+  name = if test then "drvnet-test" else "drvnet-publish";
+  src = source;
   nativeBuildInputs = [ sdk pkgs.makeWrapper ];
   dontConfigure = true;
   dontFixup = true;
   buildPhase = ''
-    export HOME="$TMPDIR/home" DOTNET_CLI_HOME="$TMPDIR/home" NUGET_PACKAGES="$TMPDIR/packages"
-    export DOTNET_NOLOGO=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE=true
-    mkdir -p "$HOME"
-    dotnet restore ${lib.escapeShellArg file} --locked-mode --configfile ${config} \
-      --source ${feed} -p:NuGetAudit=false -p:Configuration=Release
-    dotnet publish ${lib.escapeShellArg file} --no-restore --no-self-contained -c Release \
-      -p:UseAppHost=false -o "$out/lib/dotnet"
-  '';
-  installPhase = ''
-    for config in "$out"/lib/dotnet/*.runtimeconfig.json; do
-      if [ -e "$config" ]; then
-        name=$(basename "$config" .runtimeconfig.json)
-        mkdir -p "$out/bin"
-        makeWrapper ${sdk}/bin/dotnet "$out/bin/$name" --add-flags "\"$out/lib/dotnet/$name.dll\""
-      fi
-    done
-  '';
+    ${environment}
+    ${selectProject}
+    dotnet restore "$project" --locked-mode --configfile ${config} --source ${feed} \
+      -p:NuGetAudit=false -p:Configuration=Release
+  '' + (if test then ''
+    if [[ "$(dotnet msbuild "$project" -nologo -getProperty:IsTestProject -p:Configuration=Release)" != "true" ]]; then
+      echo "drvnet test needs a test project. Select it with testProject." >&2
+      exit 1
+    fi
+    dotnet test "$project" --no-restore -c Release ${lib.escapeShellArgs testArgs}
+    touch "$out"
+  '' else ''
+    dotnet publish "$project" --no-restore --no-self-contained -c Release -p:UseAppHost=false -o "$out/lib/dotnet"
+    assembly=$(dotnet msbuild "$project" -nologo -getProperty:AssemblyName -p:Configuration=Release)
+    if [[ -f "$out/lib/dotnet/$assembly.runtimeconfig.json" ]]; then
+      mkdir -p "$out/bin"
+      makeWrapper ${sdk}/bin/dotnet "$out/bin/$assembly" --add-flag "$out/lib/dotnet/$assembly.dll"
+    fi
+  '');
+  dontInstall = true;
 }

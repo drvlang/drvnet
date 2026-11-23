@@ -5,7 +5,6 @@ let
   assembly = self.lib.mkPackage {
     inherit system src sdk;
     project = "DevProxy.Abstractions/DevProxy.Abstractions.csproj";
-    sourcesFile = ./sources.json;
   };
 in pkgs.runCommand "drvnet-dev-proxy-test" { nativeBuildInputs = [ sdk ]; } ''
   export HOME="$TMPDIR" DOTNET_NOLOGO=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE=true

@@ -7,5 +7,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: cachix/install-nix-action@v31
+      - uses: DeterminateSystems/determinate-nix-action@f296148a827001a9a82d3685b53210c06e5d3b67 # v3
+        with:
+          extra-conf: |
+            extra-experimental-features = ca-derivations dynamic-derivations recursive-nix
+            extra-system-features = recursive-nix ca-derivations
+            allow-import-from-derivation = false
       - run: nix flake check -L
