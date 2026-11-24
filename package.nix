@@ -1,9 +1,10 @@
-{ drvkit, test ? false }:
+{ drvkit, nixpkgs ? null, test ? false }:
 pkgs:
 { src, project ? null, projectDir ? ".", testProject ? null, testArgs ? [],
   restoreFiles ? null, sdk ? pkgs.dotnetCorePackages.sdk_10_0 }:
 let
   inherit (pkgs) lib;
+  nixpkgsSource = import (drvkit + "/nixpkgs-source.nix") pkgs nixpkgs;
   projectFile = p: lib.any (suffix: lib.hasSuffix suffix p) [ ".csproj" ".fsproj" ".vbproj" ];
   source = if lib.isDerivation src then src else lib.cleanSourceWith {
     inherit src;
@@ -85,7 +86,7 @@ let
     prepare = ''cp ${plan} plan.json'';
     expression = ''
       import ${./feed.nix} {
-        pkgs = import ${pkgs.path} { system = "${pkgs.stdenv.hostPlatform.system}"; };
+        pkgs = import ${nixpkgsSource} { system = "${pkgs.stdenv.hostPlatform.system}"; };
         plan = builtins.fromJSON (builtins.readFile ./plan.json);
         normalize = builtins.storePath "${normalize}";
       }

@@ -6,8 +6,8 @@
   outputs = { self, nixpkgs, drvkit, ... }: import drvkit {
     inherit self nixpkgs;
     name = "drvnet";
-    mkPackage = import ./package.nix { inherit drvkit; };
-    mkTest = import ./package.nix { inherit drvkit; test = true; };
+    mkPackage = import ./package.nix { inherit drvkit nixpkgs; };
+    mkTest = import ./package.nix { inherit drvkit nixpkgs; test = true; };
     selectTarget = { src, name, target }: { inherit src; projectDir = target; };
     extraChecks = system: let
       pkgs = nixpkgs.legacyPackages.${system};
