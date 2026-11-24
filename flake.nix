@@ -5,6 +5,18 @@
 
   outputs = { self, nixpkgs, drvkit, ... }: import drvkit {
     inherit self nixpkgs;
+    toolSource = {
+      root = ./.;
+      files = [
+        ./feed.nix ./normalize.nix ./normalize/Normalize.csproj ./normalize/Program.cs
+        ./package.nix ./planner.nix ./planner/Cargo.toml ./planner/Cargo.lock
+        ./planner/src
+      ];
+      benchmarkFiles = [
+        ./benchmarks/default.nix ./benchmarks/source.nix ./benchmarks/Smoke.csproj
+        ./benchmarks/Program.cs
+      ];
+    };
     name = "drvnet";
     mkPackage = import ./package.nix { inherit drvkit nixpkgs; };
     mkTest = import ./package.nix { inherit drvkit nixpkgs; test = true; };
