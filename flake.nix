@@ -8,9 +8,7 @@
     toolSource = {
       root = ./.;
       files = [
-        ./feed.nix ./normalize.nix ./normalize/Normalize.csproj ./normalize/Program.cs
-        ./package.nix ./planner.nix ./planner/Cargo.toml ./planner/Cargo.lock
-        ./planner/src
+        ./package.nix ./tool/DrvNet.csproj ./tool/Program.cs
       ];
       benchmarkFiles = [
         ./benchmarks/default.nix ./benchmarks/source.nix ./benchmarks/Smoke.csproj
@@ -18,8 +16,8 @@
       ];
     };
     name = "drvnet";
-    mkPackage = import ./package.nix { inherit drvkit nixpkgs; };
-    mkTest = import ./package.nix { inherit drvkit nixpkgs; test = true; };
+    mkPackage = import ./package.nix {};
+    mkTest = import ./package.nix { test = true; };
     selectTarget = { src, name, target }: { inherit src; projectDir = target; };
     extraChecks = system: let
       pkgs = nixpkgs.legacyPackages.${system};
